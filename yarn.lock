@@ -2871,9 +2871,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"rivet-plugin-example-python-exec@workspace:.":
+"rivet-plugin-fs@workspace:.":
   version: 0.0.0-use.local
-  resolution: "rivet-plugin-example-python-exec@workspace:."
+  resolution: "rivet-plugin-fs@workspace:."
   dependencies:
     "@ironclad/rivet-core": ^1.5.0
     esbuild: ^0.19.2

@@ -1,21 +1,15 @@
-// src/nodes/RunPythonScriptNode.ts
-function RunPythonScriptNode_default(rivet) {
+// src/nodes/ShellCommandNode.ts
+function ShellCommandNode_default(rivet) {
   const nodeImpl = {
-    // This should create a new instance of your node type from scratch.
     create() {
       const node = {
-        // Use rivet.newId to generate new IDs for your nodes.
         id: rivet.newId(),
-        // This is the default data that your node will store
         data: {
-          scriptPath: "",
-          arguments: ""
+          command: "",
+          useCommandInput: true
         },
-        // This is the default title of your node.
-        title: "Run Python Script",
-        // This must match the type of your node.
-        type: "runPythonScript",
-        // X and Y should be set to 0. Width should be set to a reasonable number so there is no overflow.
+        title: "Shell Command",
+        type: "shellCommand",
         visualData: {
           x: 0,
           y: 0,
@@ -24,29 +18,23 @@ function RunPythonScriptNode_default(rivet) {
       };
       return node;
     },
-    // This function should return all input ports for your node, given its data, connections, all other nodes, and the project. The
-    // connection, nodes, and project are for advanced use-cases and can usually be ignored.
-    getInputDefinitions(data, _connections, _nodes, _project) {
+    getInputDefinitions(data) {
       const inputs = [];
-      if (data.useScriptPathInput) {
+      inputs.push({
+        id: "baseDirectory",
+        dataType: "string",
+        title: "Base Directory"
+      });
+      if (data.useCommandInput) {
         inputs.push({
-          id: "scriptPath",
+          id: "command",
           dataType: "string",
-          title: "Script Path"
-        });
-      }
-      if (data.useArgumentsInput) {
-        inputs.push({
-          id: "arguments",
-          dataType: "string[]",
-          title: "Arguments"
+          title: "Command"
         });
       }
       return inputs;
     },
-    // This function should return all output ports for your node, given its data, connections, all other nodes, and the project. The
-    // connection, nodes, and project are for advanced use-cases and can usually be ignored.
-    getOutputDefinitions(_data, _connections, _nodes, _project) {
+    getOutputDefinitions(_data) {
       return [
         {
           id: "output",
@@ -55,13 +43,123 @@ function RunPythonScriptNode_default(rivet) {
         }
       ];
     },
+    getUIData() {
+      return {
+        contextMenuTitle: "Shell Command",
+        group: "FS",
+        infoBoxBody: "Executes a shell command in the base directory.",
+        infoBoxTitle: "Shell Command Node"
+      };
+    },
+    getEditors(_data) {
+      return [
+        {
+          type: "string",
+          dataKey: "command",
+          useInputToggleDataKey: "useCommandInput",
+          label: "Command"
+        }
+      ];
+    },
+    getBody(data) {
+      return rivet.dedent`
+          Command: ${data.command}
+        `;
+    },
+    async process(data, inputData, context) {
+      if (context.executor !== "nodejs") {
+        throw new Error("This node can only be run using a nodejs executor.");
+      }
+      const baseDirectory = rivet.expectType(
+        inputData["baseDirectory"],
+        "string"
+      );
+      const command = rivet.getInputOrData(
+        data,
+        inputData,
+        "command",
+        "string"
+      );
+      if (command.includes("..")) {
+        throw new Error("Command cannot contain '..'");
+      }
+      const { shell } = await import("../dist/nodeEntry.cjs");
+      const output = await shell(command, {
+        cwd: baseDirectory
+      });
+      return {
+        ["output"]: {
+          type: "string",
+          value: output
+        }
+      };
+    }
+  };
+  const nodeDefinition = rivet.pluginNodeDefinition(nodeImpl, "Shell Command");
+  return nodeDefinition;
+}
+
+// src/nodes/WriteFileNode.ts
+function WriteFileNode_default(rivet) {
+  const nodeImpl = {
+    create() {
+      const node = {
+        id: rivet.newId(),
+        data: {
+          path: "",
+          usePathInput: true,
+          content: "",
+          useContentInput: true
+        },
+        title: "Write File",
+        type: "writeFile",
+        visualData: {
+          x: 0,
+          y: 0,
+          width: 200
+        }
+      };
+      return node;
+    },
+    getInputDefinitions(data) {
+      const inputs = [];
+      inputs.push({
+        id: "baseDirectory",
+        dataType: "string",
+        title: "Base Directory"
+      });
+      if (data.usePathInput) {
+        inputs.push({
+          id: "path",
+          dataType: "string",
+          title: "Path"
+        });
+      }
+      if (data.useContentInput) {
+        inputs.push({
+          id: "content",
+          dataType: "string",
+          title: "Content"
+        });
+      }
+      return inputs;
+    },
+    getOutputDefinitions(_data) {
+      return [
+        {
+          id: "content_out",
+          dataType: "string",
+          title: "Content"
+        }
+      ];
+    },
     // This returns UI information for your node, such as how it appears in the context menu.
     getUIData() {
       return {
-        contextMenuTitle: "Run Python Script",
-        group: "Example",
-        infoBoxBody: "This is an example of running a python script using a rivet node.",
-        infoBoxTitle: "Run Python Script Node"
+        contextMenuTitle: "Write File",
+        group: "FS",
+        infoBoxBody: "Writes to a file relative to the base directory.",
+        infoBoxTitle: "Write File Node"
       };
     },
     // This function defines all editors that appear when you edit your node.
@@ -69,15 +167,16 @@ function RunPythonScriptNode_default(rivet) {
       return [
         {
           type: "string",
-          dataKey: "scriptPath",
-          useInputToggleDataKey: "useScriptPathInput",
-          label: "Script Path"
+          dataKey: "path",
+          useInputToggleDataKey: "usePathInput",
+          label: "Path"
         },
         {
-          type: "string",
-          dataKey: "arguments",
-          useInputToggleDataKey: "useArgumentsInput",
-          label: "Arguments"
+          type: "code",
+          dataKey: "content",
+          useInputToggleDataKey: "useContentInput",
+          label: "Arguments",
+          language: "plaintext"
         }
       ];
     },
@@ -85,7 +184,8 @@ function RunPythonScriptNode_default(rivet) {
     // what the current data of the node is in some way that is useful at a glance.
     getBody(data) {
       return rivet.dedent`
-        ${data.scriptPath} ${data.arguments}
+        Path: ${data.path}
+        Content: ${data.content}
       `;
     },
     // This is the main processing function for your node. It can do whatever you like, but it must return
@@ -95,66 +195,58 @@ function RunPythonScriptNode_default(rivet) {
       if (context.executor !== "nodejs") {
         throw new Error("This node can only be run using a nodejs executor.");
       }
-      const scriptPath = rivet.getInputOrData(
-        data,
-        inputData,
-        "scriptPath",
+      console.dir({ inputData });
+      const baseDirectory = rivet.expectType(
+        inputData["baseDirectory"],
         "string"
       );
-      let args;
-      function splitArgs(args2) {
-        const matcher = /(?:[^\s"]+|"[^"]*")+/g;
-        return args2.match(matcher) || [];
+      const path = rivet.getInputOrData(data, inputData, "path", "string");
+      const contents = rivet.getInputOrData(
+        data,
+        inputData,
+        "content",
+        "string"
+      );
+      if (path.includes("..")) {
+        throw new Error("Path cannot contain '..'");
       }
-      const inputArguments = inputData["arguments"];
-      if (data.useArgumentsInput && inputArguments) {
-        if (rivet.isArrayDataType(inputArguments.type)) {
-          args = rivet.coerceType(inputArguments, "string[]");
-        } else {
-          const stringArgs = rivet.coerceType(inputArguments, "string");
-          args = splitArgs(stringArgs);
-        }
-      } else {
-        args = splitArgs(data.arguments);
-      }
-      const { runPythonScript } = await import("../dist/nodeEntry.cjs");
-      const output = await runPythonScript(scriptPath, args);
+      const { writeFile, join } = await import("../dist/nodeEntry.cjs");
+      await writeFile(join(baseDirectory, path), contents);
       return {
         ["output"]: {
           type: "string",
-          value: output
+          value: contents
         }
       };
     }
   };
-  const nodeDefinition = rivet.pluginNodeDefinition(
-    nodeImpl,
-    "Run Python Script"
-  );
+  const nodeDefinition = rivet.pluginNodeDefinition(nodeImpl, "Write File");
   return nodeDefinition;
 }
 
 // src/index.ts
 var initializer = (rivet) => {
-  const node = RunPythonScriptNode_default(rivet);
+  const shellCommand = ShellCommandNode_default(rivet);
+  const writeFile = WriteFileNode_default(rivet);
   const plugin = {
     // The ID of your plugin should be unique across all plugins.
-    id: "rivet-plugin-example-python-exec",
+    id: "rivet-plugin-fs",
     // The name of the plugin is what is displayed in the Rivet UI.
-    name: "Rivet Plugin Example - Python Exec",
+    name: "Rivet Plugin FS",
     // Define all configuration settings in the configSpec object.
     configSpec: {},
     // Define any additional context menu groups your plugin adds here.
     contextMenuGroups: [
       {
-        id: "example",
-        label: "Example"
+        id: "fs",
+        label: "FS"
       }
     ],
     // Register any additional nodes your plugin adds here. This is passed a `register`
     // function, which you can use to register your nodes.
     register: (register) => {
-      register(node);
+      register(shellCommand);
+      register(writeFile);
     }
   };
   return plugin;

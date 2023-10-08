@@ -1,5 +1,5 @@
 {
-  "name": "rivet-plugin-example-python-exec",
+  "name": "rivet-plugin-fs",
   "packageManager": "yarn@3.5.0",
   "version": "0.0.7",
   "type": "module",

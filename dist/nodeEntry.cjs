@@ -62,8 +62,8 @@ var require_windows = __commonJS({
   "node_modules/isexe/windows.js"(exports, module2) {
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs = require("fs");
-    function checkPathExt(path3, options) {
+    var fs2 = require("fs");
+    function checkPathExt(path4, options) {
       var pathext = options.pathExt !== void 0 ? options.pathExt : process.env.PATHEXT;
       if (!pathext) {
         return true;
@@ -74,25 +74,25 @@ var require_windows = __commonJS({
       }
       for (var i = 0; i < pathext.length; i++) {
         var p = pathext[i].toLowerCase();
-        if (p && path3.substr(-p.length).toLowerCase() === p) {
+        if (p && path4.substr(-p.length).toLowerCase() === p) {
           return true;
         }
       }
       return false;
     }
-    function checkStat(stat, path3, options) {
+    function checkStat(stat, path4, options) {
       if (!stat.isSymbolicLink() && !stat.isFile()) {
         return false;
       }
-      return checkPathExt(path3, options);
+      return checkPathExt(path4, options);
     }
-    function isexe(path3, options, cb) {
-      fs.stat(path3, function(er, stat) {
-        cb(er, er ? false : checkStat(stat, path3, options));
+    function isexe(path4, options, cb) {
+      fs2.stat(path4, function(er, stat) {
+        cb(er, er ? false : checkStat(stat, path4, options));
       });
     }
-    function sync(path3, options) {
-      return checkStat(fs.statSync(path3), path3, options);
+    function sync(path4, options) {
+      return checkStat(fs2.statSync(path4), path4, options);
     }
   }
 });
@@ -102,14 +102,14 @@ var require_mode = __commonJS({
   "node_modules/isexe/mode.js"(exports, module2) {
     module2.exports = isexe;
     isexe.sync = sync;
-    var fs = require("fs");
-    function isexe(path3, options, cb) {
-      fs.stat(path3, function(er, stat) {
+    var fs2 = require("fs");
+    function isexe(path4, options, cb) {
+      fs2.stat(path4, function(er, stat) {
         cb(er, er ? false : checkStat(stat, options));
       });
     }
-    function sync(path3, options) {
-      return checkStat(fs.statSync(path3), options);
+    function sync(path4, options) {
+      return checkStat(fs2.statSync(path4), options);
     }
     function checkStat(stat, options) {
       return stat.isFile() && checkMode(stat, options);
@@ -133,7 +133,7 @@ var require_mode = __commonJS({
 // node_modules/isexe/index.js
 var require_isexe = __commonJS({
   "node_modules/isexe/index.js"(exports, module2) {
-    var fs = require("fs");
+    var fs2 = require("fs");
     var core;
     if (process.platform === "win32" || global.TESTING_WINDOWS) {
       core = require_windows();
@@ -142,7 +142,7 @@ var require_isexe = __commonJS({
     }
     module2.exports = isexe;
     isexe.sync = sync;
-    function isexe(path3, options, cb) {
+    function isexe(path4, options, cb) {
       if (typeof options === "function") {
         cb = options;
         options = {};
@@ -152,7 +152,7 @@ var require_isexe = __commonJS({
           throw new TypeError("callback not provided");
         }
         return new Promise(function(resolve, reject) {
-          isexe(path3, options || {}, function(er, is) {
+          isexe(path4, options || {}, function(er, is) {
             if (er) {
               reject(er);
             } else {
@@ -161,7 +161,7 @@ var require_isexe = __commonJS({
           });
         });
       }
-      core(path3, options || {}, function(er, is) {
+      core(path4, options || {}, function(er, is) {
         if (er) {
           if (er.code === "EACCES" || options && options.ignoreErrors) {
             er = null;
@@ -171,9 +171,9 @@ var require_isexe = __commonJS({
         cb(er, is);
       });
     }
-    function sync(path3, options) {
+    function sync(path4, options) {
       try {
-        return core.sync(path3, options || {});
+        return core.sync(path4, options || {});
       } catch (er) {
         if (options && options.ignoreErrors || er.code === "EACCES") {
           return false;
@@ -189,7 +189,7 @@ var require_isexe = __commonJS({
 var require_which = __commonJS({
   "node_modules/which/which.js"(exports, module2) {
     var isWindows = process.platform === "win32" || process.env.OSTYPE === "cygwin" || process.env.OSTYPE === "msys";
-    var path3 = require("path");
+    var path4 = require("path");
     var COLON = isWindows ? ";" : ":";
     var isexe = require_isexe();
     var getNotFoundError = (cmd) => Object.assign(new Error(`not found: ${cmd}`), { code: "ENOENT" });
@@ -227,7 +227,7 @@ var require_which = __commonJS({
           return opt.all && found.length ? resolve(found) : reject(getNotFoundError(cmd));
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path3.join(pathPart, cmd);
+        const pCmd = path4.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         resolve(subStep(p, i, 0));
       });
@@ -254,7 +254,7 @@ var require_which = __commonJS({
       for (let i = 0; i < pathEnv.length; i++) {
         const ppRaw = pathEnv[i];
         const pathPart = /^".*"$/.test(ppRaw) ? ppRaw.slice(1, -1) : ppRaw;
-        const pCmd = path3.join(pathPart, cmd);
+        const pCmd = path4.join(pathPart, cmd);
         const p = !pathPart && /^\.[\\\/]/.test(cmd) ? cmd.slice(0, 2) + pCmd : pCmd;
         for (let j = 0; j < pathExt.length; j++) {
           const cur = p + pathExt[j];
@@ -302,7 +302,7 @@ var require_path_key = __commonJS({
 var require_resolveCommand = __commonJS({
   "node_modules/cross-spawn/lib/util/resolveCommand.js"(exports, module2) {
     "use strict";
-    var path3 = require("path");
+    var path4 = require("path");
     var which = require_which();
     var getPathKey = require_path_key();
     function resolveCommandAttempt(parsed, withoutPathExt) {
@@ -320,7 +320,7 @@ var require_resolveCommand = __commonJS({
       try {
         resolved = which.sync(parsed.command, {
           path: env[getPathKey({ env })],
-          pathExt: withoutPathExt ? path3.delimiter : void 0
+          pathExt: withoutPathExt ? path4.delimiter : void 0
         });
       } catch (e) {
       } finally {
@@ -329,7 +329,7 @@ var require_resolveCommand = __commonJS({
         }
       }
       if (resolved) {
-        resolved = path3.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
+        resolved = path4.resolve(hasCustomCwd ? parsed.options.cwd : "", resolved);
       }
       return resolved;
     }
@@ -383,8 +383,8 @@ var require_shebang_command = __commonJS({
       if (!match) {
         return null;
       }
-      const [path3, argument] = match[0].replace(/#! ?/, "").split(" ");
-      const binary = path3.split("/").pop();
+      const [path4, argument] = match[0].replace(/#! ?/, "").split(" ");
+      const binary = path4.split("/").pop();
       if (binary === "env") {
         return argument;
       }
@@ -397,16 +397,16 @@ var require_shebang_command = __commonJS({
 var require_readShebang = __commonJS({
   "node_modules/cross-spawn/lib/util/readShebang.js"(exports, module2) {
     "use strict";
-    var fs = require("fs");
+    var fs2 = require("fs");
     var shebangCommand = require_shebang_command();
     function readShebang(command) {
       const size = 150;
       const buffer = Buffer.alloc(size);
       let fd;
       try {
-        fd = fs.openSync(command, "r");
-        fs.readSync(fd, buffer, 0, size, 0);
-        fs.closeSync(fd);
+        fd = fs2.openSync(command, "r");
+        fs2.readSync(fd, buffer, 0, size, 0);
+        fs2.closeSync(fd);
       } catch (e) {
       }
       return shebangCommand(buffer.toString());
@@ -419,7 +419,7 @@ var require_readShebang = __commonJS({
 var require_parse = __commonJS({
   "node_modules/cross-spawn/lib/parse.js"(exports, module2) {
     "use strict";
-    var path3 = require("path");
+    var path4 = require("path");
     var resolveCommand = require_resolveCommand();
     var escape = require_escape();
     var readShebang = require_readShebang();
@@ -444,7 +444,7 @@ var require_parse = __commonJS({
       const needsShell = !isExecutableRegExp.test(commandFile);
       if (parsed.options.forceShell || needsShell) {
         const needsDoubleEscapeMetaChars = isCmdShimRegExp.test(commandFile);
-        parsed.command = path3.normalize(parsed.command);
+        parsed.command = path4.normalize(parsed.command);
         parsed.command = escape.command(parsed.command);
         parsed.args = parsed.args.map((arg) => escape.argument(arg, needsDoubleEscapeMetaChars));
         const shellCommand = [parsed.command].concat(parsed.args).join(" ");
@@ -597,7 +597,14 @@ var require_merge_stream = __commonJS({
 // src/nodeEntry.ts
 var nodeEntry_exports = {};
 __export(nodeEntry_exports, {
-  runPythonScript: () => runPythonScript
+  copyFile: () => copyFile2,
+  createDirectory: () => createDirectory,
+  join: () => join2,
+  moveFile: () => moveFile,
+  readFile: () => readFile2,
+  rm: () => rm2,
+  shell: () => shell,
+  writeFile: () => writeFile2
 });
 module.exports = __toCommonJS(nodeEntry_exports);
 
@@ -659,9 +666,9 @@ function npmRunPath(options = {}) {
 }
 function npmRunPathEnv({ env = import_node_process.default.env, ...options } = {}) {
   env = { ...env };
-  const path3 = pathKey({ env });
-  options.path = env[path3];
-  env[path3] = npmRunPath(options);
+  const path4 = pathKey({ env });
+  options.path = env[path4];
+  env[path4] = npmRunPath(options);
   return env;
 }
 
@@ -1916,6 +1923,18 @@ var escapeArg = (arg) => {
 var joinCommand = (file, args) => normalizeArgs(file, args).join(" ");
 var getEscapedCommand = (file, args) => normalizeArgs(file, args).map((arg) => escapeArg(arg)).join(" ");
 var SPACES_REGEXP = / +/g;
+var parseCommand = (command) => {
+  const tokens = [];
+  for (const token of command.trim().split(SPACES_REGEXP)) {
+    const previousToken = tokens.at(-1);
+    if (previousToken && previousToken.endsWith("\\")) {
+      tokens[tokens.length - 1] = `${previousToken.slice(0, -1)} ${token}`;
+    } else {
+      tokens.push(token);
+    }
+  }
+  return tokens;
+};
 var parseExpression = (expression) => {
   const typeOfExpression = typeof expression;
   if (typeOfExpression === "string") {
@@ -2188,17 +2207,64 @@ function create$(options) {
   return $2;
 }
 var $ = create$();
+function execaCommand(command, options) {
+  const [file, ...args] = parseCommand(command);
+  return execa(file, args, options);
+}
 
-// src/impl/runPythonScript.ts
-var import_node_path3 = require("path");
-async function runPythonScript(path3, args) {
-  if (path3 === "") {
-    path3 = (0, import_node_path3.join)(__dirname, "..", "scripts", "python-script.py");
-  }
-  const { stdout } = await execa("python3", [path3, ...args]);
-  return stdout;
+// src/impl/fs.ts
+var fs = __toESM(require("fs/promises"), 1);
+var path3 = __toESM(require("path"), 1);
+async function shell(command, options = {}) {
+  const proc = await execaCommand(command, {
+    timeout: 3e4,
+    all: true,
+    cwd: options.cwd,
+    shell: true,
+    reject: false,
+    extendEnv: false,
+    env: {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      USER: process.env.USER,
+      USERNAME: process.env.USERNAME,
+      SHELL: process.env.SHELL
+    }
+  });
+  return proc.all;
+}
+async function writeFile2(filePath, contents) {
+  const dir = path3.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(filePath, contents);
+}
+async function readFile2(path4) {
+  const contents = await fs.readFile(path4, "utf-8");
+  return contents;
+}
+async function rm2(path4) {
+  await fs.rm(path4);
+}
+async function copyFile2(from, to) {
+  await fs.copyFile(from, to);
+}
+async function moveFile(from, to) {
+  await fs.rename(from, to);
+}
+async function createDirectory(path4) {
+  await fs.mkdir(path4, { recursive: true });
+}
+function join2(...paths) {
+  return path3.join(...paths);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  runPythonScript
+  copyFile,
+  createDirectory,
+  join,
+  moveFile,
+  readFile,
+  rm,
+  shell,
+  writeFile
 });
