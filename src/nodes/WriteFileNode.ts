@@ -8,7 +8,6 @@ import type {
   Inputs,
   InternalProcessContext,
   NodeBodySpec,
-  NodeConnection,
   NodeId,
   NodeInputDefinition,
   NodeOutputDefinition,
@@ -23,6 +22,9 @@ import type {
 export type WriteFileNode = ChartNode<"writeFile", WriteFileNodeData>;
 
 export type WriteFileNodeData = {
+  baseDirectory: string;
+  useBaseDirectoryInput?: boolean;
+
   path: string;
   usePathInput?: boolean;
 
@@ -37,6 +39,8 @@ export default function (rivet: typeof Rivet) {
         id: rivet.newId<NodeId>(),
 
         data: {
+          baseDirectory: "",
+          useBaseDirectoryInput: true,
           path: "",
           usePathInput: true,
           content: "",
@@ -58,11 +62,13 @@ export default function (rivet: typeof Rivet) {
     getInputDefinitions(data: WriteFileNodeData): NodeInputDefinition[] {
       const inputs: NodeInputDefinition[] = [];
 
-      inputs.push({
-        id: "baseDirectory" as PortId,
-        dataType: "string",
-        title: "Base Directory",
-      });
+      if (data.useBaseDirectoryInput) {
+        inputs.push({
+          id: "baseDirectory" as PortId,
+          dataType: "string",
+          title: "Base Directory",
+        });
+      }
 
       if (data.usePathInput) {
         inputs.push({
@@ -108,6 +114,12 @@ export default function (rivet: typeof Rivet) {
       return [
         {
           type: "string",
+          dataKey: "baseDirectory",
+          useInputToggleDataKey: "useBaseDirectoryInput",
+          label: "Base Directory",
+        },
+        {
+          type: "string",
           dataKey: "path",
           useInputToggleDataKey: "usePathInput",
           label: "Path",
@@ -116,7 +128,7 @@ export default function (rivet: typeof Rivet) {
           type: "code",
           dataKey: "content",
           useInputToggleDataKey: "useContentInput",
-          label: "Arguments",
+          label: "Content",
           language: "plaintext",
         },
       ];
@@ -128,8 +140,11 @@ export default function (rivet: typeof Rivet) {
       data: WriteFileNodeData
     ): string | NodeBodySpec | NodeBodySpec[] | undefined {
       return rivet.dedent`
-        Path: ${data.path}
-        Content: ${data.content}
+        Base Directory: ${
+          data.useBaseDirectoryInput ? "(From Input)" : data.baseDirectory
+        }
+        Path: ${data.usePathInput ? "(From Input)" : data.path}
+        Content: ${data.useContentInput ? "(From Input)" : data.content}
       `;
     },
 
@@ -145,14 +160,26 @@ export default function (rivet: typeof Rivet) {
         throw new Error("This node can only be run using a nodejs executor.");
       }
 
-      console.dir({ inputData });
-
-      const baseDirectory = rivet.expectType(
-        inputData["baseDirectory" as PortId],
+      const baseDirectory = rivet.getInputOrData(
+        data,
+        inputData,
+        "baseDirectory",
         "string"
       );
 
+      if (!baseDirectory.trim()) {
+        throw new Error("Base directory cannot be empty");
+      }
+
       const path = rivet.getInputOrData(data, inputData, "path", "string");
+
+      if (!path.trim()) {
+        throw new Error("Path cannot be empty");
+      }
+
+      if (path.includes("..")) {
+        throw new Error("Path cannot contain '..'");
+      }
 
       const contents = rivet.getInputOrData(
         data,
@@ -160,10 +187,6 @@ export default function (rivet: typeof Rivet) {
         "content",
         "string"
       );
-
-      if (path.includes("..")) {
-        throw new Error("Path cannot contain '..'");
-      }
 
       const { writeFile, join } = await import("../nodeEntry");
 

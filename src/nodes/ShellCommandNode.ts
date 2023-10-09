@@ -17,8 +17,13 @@ import type {
 export type ShellCommandNode = ChartNode<"shellCommand", ShellCommandNodeData>;
 
 export type ShellCommandNodeData = {
+  workingDirectory: string;
+  useWorkingDirectoryInput?: boolean;
+
   command: string;
   useCommandInput?: boolean;
+
+  errorOnNonZeroExitCode?: boolean;
 };
 
 export default function (rivet: typeof Rivet) {
@@ -30,6 +35,11 @@ export default function (rivet: typeof Rivet) {
         data: {
           command: "",
           useCommandInput: true,
+
+          workingDirectory: "",
+          useWorkingDirectoryInput: true,
+
+          errorOnNonZeroExitCode: false,
         },
 
         title: "Shell Command",
@@ -47,11 +57,13 @@ export default function (rivet: typeof Rivet) {
     getInputDefinitions(data: ShellCommandNodeData): NodeInputDefinition[] {
       const inputs: NodeInputDefinition[] = [];
 
-      inputs.push({
-        id: "baseDirectory" as PortId,
-        dataType: "string",
-        title: "Base Directory",
-      });
+      if (data.useWorkingDirectoryInput) {
+        inputs.push({
+          id: "workingDirectory" as PortId,
+          dataType: "string",
+          title: "Working Directory",
+        });
+      }
 
       if (data.useCommandInput) {
         inputs.push({
@@ -71,6 +83,21 @@ export default function (rivet: typeof Rivet) {
           dataType: "string",
           title: "Output",
         },
+        {
+          id: "stdout" as PortId,
+          dataType: "string",
+          title: "Stdout",
+        },
+        {
+          id: "stderr" as PortId,
+          dataType: "string",
+          title: "Stderr",
+        },
+        {
+          id: "exitCode" as PortId,
+          dataType: "number",
+          title: "Exit Code",
+        },
       ];
     },
 
@@ -78,7 +105,7 @@ export default function (rivet: typeof Rivet) {
       return {
         contextMenuTitle: "Shell Command",
         group: "FS",
-        infoBoxBody: "Executes a shell command in the base directory.",
+        infoBoxBody: "Executes a shell command in the working directory.",
         infoBoxTitle: "Shell Command Node",
       };
     },
@@ -89,9 +116,20 @@ export default function (rivet: typeof Rivet) {
       return [
         {
           type: "string",
+          dataKey: "workingDirectory",
+          useInputToggleDataKey: "useWorkingDirectoryInput",
+          label: "Working Directory",
+        },
+        {
+          type: "string",
           dataKey: "command",
           useInputToggleDataKey: "useCommandInput",
           label: "Command",
+        },
+        {
+          type: "toggle",
+          dataKey: "errorOnNonZeroExitCode",
+          label: "Error on Non-Zero Exit Code",
         },
       ];
     },
@@ -100,7 +138,12 @@ export default function (rivet: typeof Rivet) {
       data: ShellCommandNodeData
     ): string | NodeBodySpec | NodeBodySpec[] | undefined {
       return rivet.dedent`
-          Command: ${data.command}
+          Working Directory: ${
+            data.useWorkingDirectoryInput
+              ? "(From Input)"
+              : data.workingDirectory
+          }
+          Command: ${data.useCommandInput ? "(From Input)" : data.command}
         `;
     },
 
@@ -113,10 +156,16 @@ export default function (rivet: typeof Rivet) {
         throw new Error("This node can only be run using a nodejs executor.");
       }
 
-      const baseDirectory = rivet.expectType(
-        inputData["baseDirectory" as PortId],
+      const workingDirectory = rivet.getInputOrData(
+        data,
+        inputData,
+        "workingDirectory",
         "string"
       );
+
+      if (!workingDirectory.trim()) {
+        throw new Error("Working directory cannot be empty.");
+      }
 
       const command = rivet.getInputOrData(
         data,
@@ -125,20 +174,40 @@ export default function (rivet: typeof Rivet) {
         "string"
       );
 
+      if (!command.trim()) {
+        throw new Error("Command cannot be empty.");
+      }
+
       if (command.includes("..")) {
         throw new Error("Command cannot contain '..'");
       }
 
       const { shell } = await import("../nodeEntry");
 
-      const output = await shell(command, {
-        cwd: baseDirectory,
+      const { all, stdout, stderr, exitCode } = await shell(command, {
+        cwd: workingDirectory,
       });
+
+      if (data.errorOnNonZeroExitCode && exitCode !== 0) {
+        throw new Error(`Command exited with non-zero exit code: ${exitCode}`);
+      }
 
       return {
         ["output" as PortId]: {
           type: "string",
-          value: output,
+          value: all,
+        },
+        ["stdout" as PortId]: {
+          type: "string",
+          value: stdout,
+        },
+        ["stderr" as PortId]: {
+          type: "string",
+          value: stderr,
+        },
+        ["exitCode" as PortId]: {
+          type: "number",
+          value: exitCode,
         },
       };
     },

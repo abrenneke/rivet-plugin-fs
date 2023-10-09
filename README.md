@@ -1,19 +1,31 @@
 <h1 align="center"><img src="https://rivet.ironcladapp.com/img/logo-banner-wide.png" alt="Rivet Logo"></h1>
 
-# Rivet Example Plugin - Python Execution
+# ⚠️ Rivet Plugin FS ⚠️
 
-This project is an example of a [Rivet](https://github.com/Ironclad/rivet) plugin that allows you to execute Python code in a Rivet node.
+This plugin for [Rivet](https://github.com/ironclad/rivet) adds the following nodes, which only work using the Node executor:
+
+- Write File Node
+- Shell Command Node
+
+Note that allowing an AI to write files and execute shell commands is _very dangerous_, and should ideally be only used in a sandboxed environment. These nodes are not included in Rivet by default for this reason.
 
 - [Using the plugin](#using-the-plugin)
   - [In Rivet](#in-rivet)
-  - [In Code](#in-code)
-- [Making your own plugin](#making-your-own-plugin)
-  - [⚠️ Important Notes ⚠️](#️-important-notes-️)
-  - [1. Plugin Definition](#1-plugin-definition)
-  - [2. Node Definitions](#2-node-definitions)
-  - [3. Bundling](#3-bundling)
-  - [5. Serving your plugin](#5-serving-your-plugin)
-  - [Loading your plugin using the SDK](#loading-your-plugin-using-the-sdk)
+  - [In the SDK](#in-the-sdk)
+- [Nodes](#nodes)
+  - [Write File Node](#write-file-node)
+    - [Inputs](#inputs)
+    - [Outputs](#outputs)
+    - [Editor Settings](#editor-settings)
+    - [Example 1: Write LLM reply to a hardcoded file](#example-1-write-llm-reply-to-a-hardcoded-file)
+    - [Example 2: Allow the LLM to write to a file of its choosing](#example-2-allow-the-llm-to-write-to-a-file-of-its-choosing)
+    - [Error Handling](#error-handling)
+  - [Shell Command Node](#shell-command-node)
+    - [Inputs](#inputs-1)
+    - [Outputs](#outputs-1)
+    - [Editor Settings](#editor-settings-1)
+    - [Example: List files in `/tmp` using `ls -al`](#example-list-files-in-tmp-using-ls--al)
+    - [Error Handling](#error-handling-1)
 - [Local Development](#local-development)
 
 ## Using the plugin
@@ -22,66 +34,145 @@ This project is an example of a [Rivet](https://github.com/Ironclad/rivet) plugi
 
 To use this plugin in Rivet:
 
-1. Navigate to the Project tab in the left sidebar. You will see a + button next to `Plugins`,
-   click it to open the Add Plugin modal.
-2. In Add NPM Plugin, enter `rivet-plugin-example-python-exec` and click `Add NPM Plugin`.
-3. The example plugin is now installed in your project. You can add the Run Python Script using the Add Node menu, in the "Example" group..
+1. Open the plugins overlay at the top of the screen.
+2. Search for "rivet-plugin-fs"
+3. Click the "Install" button to install the plugin into your current project.
 
-### In Code
+### In the SDK
 
-## Making your own plugin
+1. Import the plugin and Rivet into your project:
 
-### ⚠️ Important Notes ⚠️
+   ```ts
+   import * as Rivet from "@ironclad/rivet";
+   import RivetPluginFs from "@ironclad/rivet-plugin-fs";
+   ```
 
-- You must bundle your plugins, or include all code for your plugin in the ESM files. Plugins are loaded using `import(pluginUrl)` so must follow all rules for ESM modules. This means that you cannot use `require` or `module.exports` in your plugin code. If you need to use external libraries, you must bundle them.
+2. Initialize the plugin and register the nodes with the `globalRivetNodeRegistry`:
 
-- You also cannot import nor bundle `@ironclad/rivet-core` in your plugin. The rivet core library is passed into your default export function as an argument. Be careful to only use `import type` statements for the core library, otherwise your plugin will not bundle successfully.
+   ```ts
+   Rivet.globalRivetNodeRegistry.registerPlugin(RivetPluginFs(Rivet));
+   ```
 
-- This repo is also an example of a Node.js-only plugin. It is important that Node-only plugins are separated into two separate bundles - an isomorphic bundle that defines the plugin and all of the nodes, and a Node-only bundle that contains the node-only implementations. The isomorphic bundle is allowed to _dynamically_ import the node bundle, but cannot statically import it (except for types, of course).
+   (You may also use your own node registry if you wish, instead of the global one.)
 
-- **Currently, all node.js dependencies must be bundled into the node entry point, as node_modules is not installed for Rivet.**
+3. The nodes will now work when ran with `runGraphInFile` or `createProcessor`.
 
-This repository has examples for both dual-bundling with [ESBuild](https://esbuild.github.io/), only importing types from `@ironclad/rivet-core`, and using `import()` to dynamically import the node bundle from the isomorphic bundle.
+## Nodes
 
-### 1. Plugin Definition
+### Write File Node
 
-Follow the example in [src/index.ts](src/index.ts) to define your plugin. Your plugin must default-export a function that takes in the Rivet Core library as its only argument, and returns a valid `RivetPlugin` object.
+The write file node allows Rivet to write to files on the local file system. The node executor is required for this node to work.
 
-### 2. Node Definitions
+The node takes in a base directory (an absolute path), and a file path (a relative path). The node cannot write to paths outside of the base directory, and will throw an error if it is asked to do so.
 
-Follow the example in [src/nodes/ExamplePluginNode.ts](src/nodes/ExamplePluginNode.ts) to define your plugin's nodes. You should follow a simlar syntax of exporting functions that take in the Rivet Core library.
+![Write File Node Screenshot](./write-file-node.png)
 
-- Nodes must implement `PluginNodeDefinition<T>` by calling `pluginNodeDefinition(yourPluginImpl, "Node Name")`.
-- Node implementations must implement `PluginNodeImpl<T>`.
-- `T` should be your plugin's type definition.
+#### Inputs
 
-### 3. Bundling
+See [Editor Settings](#editor-settings) for all inputs.
 
-See [bundle.ts](bundle.ts) for an example of how to bundle your plugin. You can use any bundler you like, but you must bundle into two final files - an isomorphic bundle, and a node.js only bundle. You can use the [ESBuild](https://esbuild.github.io/) bundler to bundle your plugin into a single file.
+#### Outputs
 
-It is important that all external libraries are bundled in the _isomorphic bundle_, because browsers cannot load bare imports. However, you are allowed to
-import any external libraries in the _node bundle_. Note that as of now, dependencies of a bundle are not loaded. This means that node_modules dependencies must be bundled into the final bundle.
+| Title   | Data Type | Description                              |
+| ------- | --------- | ---------------------------------------- |
+| Content | `string`  | The content that was written to the file |
 
-### 5. Serving your plugin
+#### Editor Settings
 
-You should then publish your plugin to NPM. The bundled files should be included, and the `"main"` field in your `package.json` should point to the isomorphic bundle.
+| Setting        | Description                                                                                                  | Default Value     | Use Input Toggle | Input Data Type | Notes                                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------ | ----------------- | ---------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Base Directory | The base directory for all files that will be written. All files written must be inside this base directory. | (from input port) | Yes              | `string`        | Required to be non-empty                                                                                                   |
+| Path           | The path and file name of the file to write to. Will be combined with the base directory to write the file.  | (from input port) | Yes              | `string`        | Required to be non-empty. Cannot contain `..`. If the path contains directory segments, those directories will be created. |
+| Content        | The content to write to the file.                                                                            | (from input port) | Yes              | `string`        |
 
-### Loading your plugin using the SDK
+#### Example 1: Write LLM reply to a hardcoded file
 
-First make sure your plugin is available on NPM or another method so it can be `import`ed.
+1. Create two Text nodes, one containins a base directory, such as `/tmp`, and another with a hardcoded file name, such as `file-from-llm.txt`. Connect them to the Write File node's `Base Directory` and `Path` inputs, respectively.
+2. Create a Chat node and give it a prompt using a Text node, and connect the response from the Chat node to the Write File node's `Content` input.
+3. Run the graph, and the reply from the LLM will be saved to the file specified.
 
-Load your plugin and Rivet into your application:
+![Example 1](./write-file-node-example-01.png)
 
-```ts
-import * as Rivet from "@ironclad/rivet-core";
-import yourPlugin from "<your-package-name>";
-```
+#### Example 2: Allow the LLM to write to a file of its choosing
 
-Register your plugin with Rivet be using the `globalRivetNodeRegistry` or creating a new `NodeRegistration` and registering with that:
+1. Create a Text node with a prompt for an LLM, something like this:
 
-```ts
-Rivet.globalRivetNodeRegistry.registerPlugin(yourPlugin(Rivet));
-```
+   ````
+   Reply with a YAML document with the following structure:
+
+    ```yaml
+    file:
+      file-name: some-file.txt
+      content: |
+        This is the content of the file
+   ````
+
+   You are allowed to choose any file and any content you wish.
+
+   ```
+
+   ```
+
+2. Connect that to a Chat node's prompt.
+3. Pipe the output of the Chat node into an Extract YAML node, and set the `Root Property Name` to `file` (as that is the root property we've told the LLM to use)
+4. Pipe the `Output` port of the Extract Yaml into two Extract Object Path nodes
+   1. One with the path `$.file['file-name']`, and connect that to the `Path` input of the Write File node
+   2. One with the path `$.file['content']`, and connect that to the `Content` input of the Write File node
+5. Connect a text node with a base directory such as `/tmp` to the `Base Directory` port of the Write File Node
+6. Run the graph, and observe that the LLM writes to a file in your `/tmp` directory.
+
+![Example 2](./write-file-node-example-02.png)
+
+#### Error Handling
+
+- If the base directory is empty, the node will throw an error.
+- If the path is empty, the node will throw an error.
+- If the contents are empty, then an empty file will be written.
+- If there is an error writing to the specified file, or the specified file lies outside the base directory, the node will throw an error.
+
+### Shell Command Node
+
+The shell command node can run arbitrary shell commands on the local machine. The node executor is required for this node to work.
+
+The node takes in a working directory, and a command to run. The command is run in the working directory, and the output of the command is returned.
+
+The command is ran using the default shell configured for the machine.
+
+![Shell Command Node Screenshot](./shell-command-node.png)
+
+#### Inputs
+
+See [Editor Settings](#editor-settings-1) for all inputs.
+
+#### Outputs
+
+| Title     | Data Type | Description                                        |
+| --------- | --------- | -------------------------------------------------- |
+| Output    | `string`  | The combined `stdout` and `stderr` of the command. |
+| Stdout    | `string`  | The standard output of the command.                |
+| Stderr    | `string`  | The standard error of the command.                 |
+| Exit Code | `number`  | The exit code that the shell command returned.     |
+
+#### Editor Settings
+
+| Setting                     | Description                                                                       | Default Value     | Use Input Toggle | Input Data Type | Notes                                                 |
+| --------------------------- | --------------------------------------------------------------------------------- | ----------------- | ---------------- | --------------- | ----------------------------------------------------- |
+| Working Directory           | The working directory that the shell command will be executed in.                 | (from input port) | Yes              | `string`        | Required to be non-empty.                             |
+| Shell Command               | The command to execute using the environment default shell.                       | (from input port) | Yes              | `string`        | Just be careful.                                      |
+| Error on non-zero exit code | If toggled on, the node will error of the command returns an exit code besides 0. | False             | No               | N/A             | Useful for aborting graphs when something goes wrong. |
+
+#### Example: List files in `/tmp` using `ls -al`
+
+1. Make sure you are using the Node executor.
+2. Create two Text nodes, one containing the working directory, such as `/tmp`, and another with the command, such as `ls -al`. Connect them to the Shell Command node's `Working Directory` and `Shell Command` inputs, respectively.
+3. Run the graph, and the output of the command will be returned from the Shell Command node.
+
+![Example](./shell-command-node-example-01.png)
+
+#### Error Handling
+
+- The working directory and command must both be non-empty. If the are empty, node will throw an error.
+- If the shell command does not parse successfully, the node will throw an error.
 
 ## Local Development
 
@@ -91,5 +182,5 @@ Rivet.globalRivetNodeRegistry.registerPlugin(yourPlugin(Rivet));
 
    To develop locally, you have two options:
 
-   - After each change to your compiled bundled, copy your bundled files into the above directory, and restart Rivet
+   - After each change to your compiled bundled, copy your bundled files into the above directory, and restart Rivet.
    - Turn the above plugin directory into your main plugin development directory, and do all your development from that directory. Restart Rivet after each change.

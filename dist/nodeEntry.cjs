@@ -2231,7 +2231,12 @@ async function shell(command, options = {}) {
       SHELL: process.env.SHELL
     }
   });
-  return proc.all;
+  return {
+    all: proc.all,
+    stdout: proc.stdout,
+    stderr: proc.stderr,
+    exitCode: proc.exitCode
+  };
 }
 async function writeFile2(filePath, contents) {
   const dir = path3.dirname(filePath);

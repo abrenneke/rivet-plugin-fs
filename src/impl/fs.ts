@@ -2,10 +2,7 @@ import { execaCommand } from "execa";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-export async function shell(
-  command: string,
-  options: { cwd?: string } = {}
-): Promise<string> {
+export async function shell(command: string, options: { cwd?: string } = {}) {
   const proc = await execaCommand(command, {
     timeout: 30000,
     all: true,
@@ -22,7 +19,12 @@ export async function shell(
     },
   });
 
-  return proc.all!;
+  return {
+    all: proc.all!,
+    stdout: proc.stdout!,
+    stderr: proc.stderr!,
+    exitCode: proc.exitCode,
+  };
 }
 
 export async function writeFile(

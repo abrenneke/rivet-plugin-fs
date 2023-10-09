@@ -6,7 +6,10 @@ function ShellCommandNode_default(rivet) {
         id: rivet.newId(),
         data: {
           command: "",
-          useCommandInput: true
+          useCommandInput: true,
+          workingDirectory: "",
+          useWorkingDirectoryInput: true,
+          errorOnNonZeroExitCode: false
         },
         title: "Shell Command",
         type: "shellCommand",
@@ -20,11 +23,13 @@ function ShellCommandNode_default(rivet) {
     },
     getInputDefinitions(data) {
       const inputs = [];
-      inputs.push({
-        id: "baseDirectory",
-        dataType: "string",
-        title: "Base Directory"
-      });
+      if (data.useWorkingDirectoryInput) {
+        inputs.push({
+          id: "workingDirectory",
+          dataType: "string",
+          title: "Working Directory"
+        });
+      }
       if (data.useCommandInput) {
         inputs.push({
           id: "command",
@@ -40,6 +45,21 @@ function ShellCommandNode_default(rivet) {
           id: "output",
           dataType: "string",
           title: "Output"
+        },
+        {
+          id: "stdout",
+          dataType: "string",
+          title: "Stdout"
+        },
+        {
+          id: "stderr",
+          dataType: "string",
+          title: "Stderr"
+        },
+        {
+          id: "exitCode",
+          dataType: "number",
+          title: "Exit Code"
         }
       ];
     },
@@ -47,7 +67,7 @@ function ShellCommandNode_default(rivet) {
       return {
         contextMenuTitle: "Shell Command",
         group: "FS",
-        infoBoxBody: "Executes a shell command in the base directory.",
+        infoBoxBody: "Executes a shell command in the working directory.",
         infoBoxTitle: "Shell Command Node"
       };
     },
@@ -55,42 +75,77 @@ function ShellCommandNode_default(rivet) {
       return [
         {
           type: "string",
+          dataKey: "workingDirectory",
+          useInputToggleDataKey: "useWorkingDirectoryInput",
+          label: "Working Directory"
+        },
+        {
+          type: "string",
           dataKey: "command",
           useInputToggleDataKey: "useCommandInput",
           label: "Command"
+        },
+        {
+          type: "toggle",
+          dataKey: "errorOnNonZeroExitCode",
+          label: "Error on Non-Zero Exit Code"
         }
       ];
     },
     getBody(data) {
       return rivet.dedent`
-          Command: ${data.command}
+          Working Directory: ${data.useWorkingDirectoryInput ? "(From Input)" : data.workingDirectory}
+          Command: ${data.useCommandInput ? "(From Input)" : data.command}
         `;
     },
     async process(data, inputData, context) {
       if (context.executor !== "nodejs") {
         throw new Error("This node can only be run using a nodejs executor.");
       }
-      const baseDirectory = rivet.expectType(
-        inputData["baseDirectory"],
+      const workingDirectory = rivet.getInputOrData(
+        data,
+        inputData,
+        "workingDirectory",
         "string"
       );
+      if (!workingDirectory.trim()) {
+        throw new Error("Working directory cannot be empty.");
+      }
       const command = rivet.getInputOrData(
         data,
         inputData,
         "command",
         "string"
       );
+      if (!command.trim()) {
+        throw new Error("Command cannot be empty.");
+      }
       if (command.includes("..")) {
         throw new Error("Command cannot contain '..'");
       }
       const { shell } = await import("../dist/nodeEntry.cjs");
-      const output = await shell(command, {
-        cwd: baseDirectory
+      const { all, stdout, stderr, exitCode } = await shell(command, {
+        cwd: workingDirectory
       });
+      if (data.errorOnNonZeroExitCode && exitCode !== 0) {
+        throw new Error(`Command exited with non-zero exit code: ${exitCode}`);
+      }
       return {
         ["output"]: {
           type: "string",
-          value: output
+          value: all
+        },
+        ["stdout"]: {
+          type: "string",
+          value: stdout
+        },
+        ["stderr"]: {
+          type: "string",
+          value: stderr
+        },
+        ["exitCode"]: {
+          type: "number",
+          value: exitCode
         }
       };
     }
@@ -106,6 +161,8 @@ function WriteFileNode_default(rivet) {
       const node = {
         id: rivet.newId(),
         data: {
+          baseDirectory: "",
+          useBaseDirectoryInput: true,
           path: "",
           usePathInput: true,
           content: "",
@@ -123,11 +180,13 @@ function WriteFileNode_default(rivet) {
     },
     getInputDefinitions(data) {
       const inputs = [];
-      inputs.push({
-        id: "baseDirectory",
-        dataType: "string",
-        title: "Base Directory"
-      });
+      if (data.useBaseDirectoryInput) {
+        inputs.push({
+          id: "baseDirectory",
+          dataType: "string",
+          title: "Base Directory"
+        });
+      }
       if (data.usePathInput) {
         inputs.push({
           id: "path",
@@ -167,6 +226,12 @@ function WriteFileNode_default(rivet) {
       return [
         {
           type: "string",
+          dataKey: "baseDirectory",
+          useInputToggleDataKey: "useBaseDirectoryInput",
+          label: "Base Directory"
+        },
+        {
+          type: "string",
           dataKey: "path",
           useInputToggleDataKey: "usePathInput",
           label: "Path"
@@ -175,7 +240,7 @@ function WriteFileNode_default(rivet) {
           type: "code",
           dataKey: "content",
           useInputToggleDataKey: "useContentInput",
-          label: "Arguments",
+          label: "Content",
           language: "plaintext"
         }
       ];
@@ -184,8 +249,9 @@ function WriteFileNode_default(rivet) {
     // what the current data of the node is in some way that is useful at a glance.
     getBody(data) {
       return rivet.dedent`
-        Path: ${data.path}
-        Content: ${data.content}
+        Base Directory: ${data.useBaseDirectoryInput ? "(From Input)" : data.baseDirectory}
+        Path: ${data.usePathInput ? "(From Input)" : data.path}
+        Content: ${data.useContentInput ? "(From Input)" : data.content}
       `;
     },
     // This is the main processing function for your node. It can do whatever you like, but it must return
@@ -195,21 +261,28 @@ function WriteFileNode_default(rivet) {
       if (context.executor !== "nodejs") {
         throw new Error("This node can only be run using a nodejs executor.");
       }
-      console.dir({ inputData });
-      const baseDirectory = rivet.expectType(
-        inputData["baseDirectory"],
+      const baseDirectory = rivet.getInputOrData(
+        data,
+        inputData,
+        "baseDirectory",
         "string"
       );
+      if (!baseDirectory.trim()) {
+        throw new Error("Base directory cannot be empty");
+      }
       const path = rivet.getInputOrData(data, inputData, "path", "string");
+      if (!path.trim()) {
+        throw new Error("Path cannot be empty");
+      }
+      if (path.includes("..")) {
+        throw new Error("Path cannot contain '..'");
+      }
       const contents = rivet.getInputOrData(
         data,
         inputData,
         "content",
         "string"
       );
-      if (path.includes("..")) {
-        throw new Error("Path cannot contain '..'");
-      }
       const { writeFile, join } = await import("../dist/nodeEntry.cjs");
       await writeFile(join(baseDirectory, path), contents);
       return {
