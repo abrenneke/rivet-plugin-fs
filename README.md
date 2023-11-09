@@ -43,7 +43,7 @@ To use this plugin in Rivet:
 1. Import the plugin and Rivet into your project:
 
    ```ts
-   import * as Rivet from "@ironclad/rivet";
+   import * as Rivet from "@ironclad/rivet-node";
    import RivetPluginFs from "@ironclad/rivet-plugin-fs";
    ```
 
